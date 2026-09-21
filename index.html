@@ -28,6 +28,33 @@
   <div class="bar"><i id="bar"></i></div>
 </aside>
 <div id="canvasWrap"></div>
+
+<!-- HUD inspired by classic MMO layouts: observer, not a player avatar -->
+<div class="observer-frame">
+  <div class="portrait"><div class="portrait-orb">◉</div><div><b>ناظر</b><small>بدون شخصیت قابل‌کنترل</small></div></div>
+  <div class="observer-bars"><div><i id="cycleEnergy"></i></div><div><i id="lifeEnergy"></i></div></div>
+</div>
+
+<div class="event-log">
+  <h3>رویدادهای چرخه</h3>
+  <div id="eventLog"><p>نور خورشید وارد چرخه شد.</p></div>
+</div>
+
+<div class="minimap">
+  <div class="minimap-title">نمای جهان</div>
+  <div class="mini-orbit"><span></span><i></i><b></b></div>
+  <div class="mini-controls"><button id="zoomOut">−</button><button id="zoomIn">+</button></div>
+</div>
+
+<div class="actionbar">
+  <button data-action="sun" title="خورشید">☀<small>خورشید</small></button>
+  <button data-action="zodiac" title="زودیاک">♈<small>زودیاک</small></button>
+  <button data-action="tree" title="درخت حیات">🌳<small>درخت</small></button>
+  <button data-action="earth" title="زمین">🌍<small>زمین</small></button>
+  <button data-action="life" title="موجودات">🐾<small>حیات</small></button>
+  <button data-action="cycle" title="چرخه">∞<small>چرخه</small></button>
+  <button id="cameraReset" title="نمای کلی">⌖<small>کلی</small></button>
+</div>
 <div class="chapter"><span id="chapter">نور خورشید</span><b id="chapterSub">آغاز چرخه</b></div>
 <nav class="bottom hud">
   <button id="pause" class="gold">Ⅱ توقف</button>
