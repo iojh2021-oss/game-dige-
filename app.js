@@ -1,6 +1,8 @@
 import * as THREE from "https://esm.sh/three@0.161.0";
 import {OrbitControls} from "https://esm.sh/three@0.161.0/examples/jsm/controls/OrbitControls.js";
 import {GLTFLoader} from "https://esm.sh/three@0.161.0/examples/jsm/loaders/GLTFLoader.js";
+import {KTX2Loader} from "https://esm.sh/three@0.161.0/examples/jsm/loaders/KTX2Loader.js";
+import {DRACOLoader} from "https://esm.sh/three@0.161.0/examples/jsm/loaders/DRACOLoader.js";
 
 const TAU=Math.PI*2;
 const zodiac=[
@@ -21,6 +23,8 @@ camera.position.set(0,10,27);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;
+const dracoLoader=new DRACOLoader();dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
+const ktx2Loader=new KTX2Loader();ktx2Loader.setTranscoderPath("https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/libs/basis/");ktx2Loader.detectSupport(renderer);gltfLoader.setDRACOLoader(dracoLoader);gltfLoader.setKTX2Loader(ktx2Loader);
 document.getElementById("canvasWrap").appendChild(renderer.domElement);
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.055;controls.minDistance=8;controls.maxDistance=55;controls.maxPolarAngle=Math.PI*.47;controls.target.set(0,5,0);
 
@@ -195,3 +199,43 @@ function animateLiving(now){
 
 }
 animateLiving(performance.now());
+
+/* ===== COMPLETE MMO OBSERVER VISUAL PASS ===== */
+const visualState={day:0,generation:1,event:0};
+const selectedGlow=new THREE.Mesh(new THREE.RingGeometry(.7,.76,48),new THREE.MeshBasicMaterial({color:0xffe36a,transparent:true,opacity:.85,side:THREE.DoubleSide}));
+selectedGlow.rotation.x=Math.PI/2;selectedGlow.visible=false;scene.add(selectedGlow);
+const waterSurface=new THREE.Mesh(new THREE.CircleGeometry(9.9,96),new THREE.MeshPhysicalMaterial({color:0x168fd0,roughness:.12,metalness:.05,transmission:.12,transparent:true,opacity:.82,clearcoat:.55,clearcoatRoughness:.12}));
+waterSurface.rotation.x=-Math.PI/2;waterSurface.position.y=.22;world.add(waterSurface);
+const waterfalls=[];
+for(let i=0;i<6;i++){const m=new THREE.Mesh(new THREE.PlaneGeometry(.55,3.8,8,18),new THREE.MeshPhysicalMaterial({color:0x69d9ff,transparent:true,opacity:.58,roughness:.05,emissive:0x0a75b8,emissiveIntensity:.35,side:THREE.DoubleSide}));m.position.set(-12+i*4.8,1.7,-5.7);waterfalls.push(m);world.add(m)}
+const meadow=new THREE.Group();world.add(meadow);
+for(let i=0;i<180;i++){const g=new THREE.Group(),a=Math.random()*TAU,r=3+Math.random()*10;const blade=new THREE.Mesh(new THREE.ConeGeometry(.025,.25+Math.random()*.35,5),mat(i%5?0x4d9d4d:0x78c85c,.9));g.add(blade);g.position.set(Math.cos(a)*r,.35,Math.sin(a)*r*.58);g.rotation.y=Math.random()*TAU;meadow.add(g)}
+const solarSectors=[];
+for(let i=0;i<12;i++){const a=i/12*TAU;const sector=new THREE.Mesh(new THREE.RingGeometry(9.7,10.15,24,1,a-.11),new THREE.MeshBasicMaterial({color:i%3===0?0xffd65a:i%3===1?0x5fc8ff:0xc58cff,transparent:true,opacity:.2,side:THREE.DoubleSide}));sector.rotation.x=Math.PI/2;sector.position.copy(zodiacGroup.position);solarSectors.push(sector);scene.add(sector)}
+const lifeEvents=[["تولد بذر","انرژی از درخت به زمین می‌رسد."],["رشد","گیاه از خاک بالا می‌آید."],["بلوغ","گیاه و موجود زنده به مرحلهٔ بالغ می‌رسند."],["زایش","یک موجود جدید در چرخه ظاهر می‌شود."],["بازگشت","انرژی و ماده به چرخه بازمی‌گردد."]];
+let lifeEventIndex=0,lifeEventClock=0;
+function advanceLifeEvent(dt){lifeEventClock+=dt*speed;if(lifeEventClock<4.2)return;lifeEventClock=0;lifeEventIndex=(lifeEventIndex+1)%lifeEvents.length;visualState.generation++;logEvent(lifeEvents[lifeEventIndex][0]+" — "+lifeEvents[lifeEventIndex][1])}
+function polishAsset(root){root.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.receiveShadow=true;if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if("roughness" in m)m.roughness=Math.min(.85,Math.max(.18,m.roughness??.55));if("envMapIntensity" in m)m.envMapIntensity=1.25})}})}
+function animateVisualPass(dt,now){
+  loadedActors.forEach(a=>{if(!a.root.userData.polished){polishAsset(a.root);a.root.userData.polished=true}});
+  visualState.day=(visualState.day+dt*speed*.018)%1;
+  const sunAngle=visualState.day*TAU;
+  sun.position.set(Math.cos(sunAngle)*18,11+Math.sin(sunAngle)*9,Math.sin(sunAngle)*8);sunLight.position.copy(sun.position);
+  sunLight.intensity=130+Math.max(0,Math.sin(sunAngle))*150;ambient.intensity=.9+Math.max(0,Math.sin(sunAngle))*1.6;halo.position.copy(sun.position);
+  waterSurface.material.opacity=.72+.08*Math.sin(now*.0015);waterSurface.rotation.z+=dt*.006;
+  waterfalls.forEach((m,i)=>{m.material.opacity=.46+.16*Math.sin(now*.002+i);m.scale.y=.92+.1*Math.sin(now*.0022+i)});
+  solarSectors.forEach((q,i)=>{q.material.opacity=.15+.13*Math.sin(now*.0018+i*.4);q.rotation.z+=dt*(.008+i*.0002)});
+  meadow.children.forEach((g,i)=>{g.rotation.z=Math.sin(now*.0017+i)*.07});
+  lifeGlow.scale.setScalar(1.02+Math.sin(now*.002)*.06);lifeGlow.scale.y=1.35+Math.sin(now*.002)*.1;
+  advanceLifeEvent(dt);
+  cycleEnergy.style.width=(52+Math.sin(now*.002)*28)+"%";lifeEnergy.style.width=(66+Math.sin(now*.0014+2)*24)+"%";
+  if(selectedGlow.visible){selectedGlow.scale.setScalar(1+.08*Math.sin(now*.004));selectedGlow.material.opacity=.55+.3*Math.sin(now*.003)}
+}
+function cinematicFocus(target,distance=7,duration=850){
+  const startPos=camera.position.clone(),startTarget=controls.target.clone(),endTarget=target.clone(),dir=camera.position.clone().sub(target).normalize();
+  if(dir.lengthSq()<.01)dir.set(0,.2,1);const endPos=target.clone().add(dir.multiplyScalar(distance)).add(new THREE.Vector3(0,1.2,0)),start=performance.now();
+  function tick(t){const q=Math.min(1,(t-start)/duration),e=q*q*(3-2*q);camera.position.lerpVectors(startPos,endPos,e);controls.target.lerpVectors(startTarget,endTarget,e);if(q<1)requestAnimationFrame(tick)}requestAnimationFrame(tick)
+}
+const baseSelectObject=selectObject;
+selectObject=function(o){baseSelectObject(o);const wp=new THREE.Vector3();o.getWorldPosition(wp);selectedGlow.position.copy(wp);selectedGlow.visible=true;cinematicFocus(wp,o.userData?.type==="zodiac"?5.5:6.5)};
+(function startVisualPass(){let last=performance.now();function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;animateVisualPass(dt,now);requestAnimationFrame(frame)}requestAnimationFrame(frame)})();
