@@ -26,7 +26,7 @@ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.12;
-document.getElementById("canvasWrap").appendChild(renderer.domElement);
+document.getElementById("canvasWrap").appendChild(renderer.domElement); const boot=document.getElementById("bootDebug"); if(boot) boot.textContent="VERSION 2026-09-21-D2 · THREE.JS OK · 3D WORLD RUNNING";
 
 const clock=new THREE.Clock();
 let time=0,stage=0,stageTimer=0,running=true,speed=1,cycle=0;
