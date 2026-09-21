@@ -93,3 +93,31 @@ controls.update();renderer.render(scene,camera)}
 setStage();animate(performance.now());
 addEventListener("resize",()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.8))});
 setTimeout(()=>{document.getElementById("loading").style.opacity="0";setTimeout(()=>document.getElementById("loading").remove(),700)},900);
+
+
+// --- Observer MMO HUD interactions ---
+const eventLog=document.getElementById("eventLog");
+const cycleEnergy=document.getElementById("cycleEnergy");
+const lifeEnergy=document.getElementById("lifeEnergy");
+function logEvent(t){if(!eventLog)return;const p=document.createElement("p");p.textContent="• "+t;eventLog.prepend(p);while(eventLog.children.length>3)eventLog.lastElementChild.remove();}
+function focusZone(kind){
+  document.querySelectorAll(".actionbar button").forEach(b=>b.classList.toggle("active",b.dataset.action===kind));
+  if(kind==="sun"){controls.target.set(0,18,0);camera.position.set(0,19,11);chapter.textContent="خورشید";chapterSub.textContent="منبع نور نمادین";}
+  if(kind==="zodiac"){controls.target.set(0,20,0);camera.position.set(0,25,18);chapter.textContent="۱۲ زودیاک";chapterSub.textContent="چرخهٔ خورشیدی";}
+  if(kind==="tree"){controls.target.set(0,5,0);camera.position.set(0,8,18);chapter.textContent="درخت حیات";chapterSub.textContent="۱۰ سفیروت · ۲۲ مسیر";}
+  if(kind==="earth"){controls.target.set(0,0,0);camera.position.set(0,8,18);chapter.textContent="زمین";chapterSub.textContent="بستر چرخه";}
+  if(kind==="life"){controls.target.set(0,1,0);camera.position.set(0,6,13);chapter.textContent="موجودات زنده";chapterSub.textContent="حرکت خودکار";}
+  if(kind==="cycle"){document.getElementById("overview").click();chapter.textContent="چرخهٔ کامل";chapterSub.textContent="خورشید → زودیاک → درخت → زمین → حیات → بازگشت";}
+  logEvent("ناظر به بخش «"+chapter.textContent+"» رفت.");
+}
+document.querySelectorAll(".actionbar button[data-action]").forEach(b=>b.addEventListener("click",()=>focusZone(b.dataset.action)));
+document.getElementById("cameraReset")?.addEventListener("click",()=>document.getElementById("overview").click());
+document.getElementById("zoomIn")?.addEventListener("click",()=>{camera.position.multiplyScalar(.82)});
+document.getElementById("zoomOut")?.addEventListener("click",()=>{camera.position.multiplyScalar(1.22)});
+const oldSetStage=setStage;
+setStage=function(){
+  oldSetStage();
+  if(cycleEnergy)cycleEnergy.style.width=(45+stage/11*45)+"%";
+  if(lifeEnergy)lifeEnergy.style.width=(25+stage/10*70)+"%";
+  logEvent("مرحلهٔ "+(stage+1)+" از چرخه: "+cycleStages[stage][0]);
+};
