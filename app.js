@@ -224,36 +224,33 @@ for(let i=0;i<10;i++){const a=animal(i),ang=i/10*TAU,r=4.7+Math.random()*4;a.pos
 const flowers=new THREE.Group();world.add(flowers);
 for(let i=0;i<32;i++){const a=Math.random()*TAU,r=3+Math.random()*11;sph(flowers,.11,mats.flower,Math.cos(a)*r,.42,Math.sin(a)*r*.58)}
 
-/* QUIXEL / FAB ASSET LAYER
-   D7: the previous arbitrary remote GLBs are removed.
-   The scene now accepts a coherent local Quixel/Fab asset set under
-   assets/quixel/. This avoids mixing unrelated asset styles and keeps
-   redistribution/licensing under the user's own Fab/Quixel account.
+/* GAMEPLAY ASSET LAYER
+   Real game-ready CC0 assets, chosen to match the bright stylized third-person
+   gameplay references: dense meadow, varied trees/bushes and a visible observer
+   character. No primitive spheres are used for the main environmental models.
 */
-const QUIXEL_ASSETS={
-  forestTerrain:"./assets/quixel/forest-terrain.glb",
-  broadleafCliff:"./assets/quixel/broadleaf-cliff-l01.glb",
-  broadleafRock:"./assets/quixel/broadleaf-rock-l03.glb",
-  nordicRock:"./assets/quixel/nordic-forest-cluster-rock-small.glb",
-  mossyRockCluster:"./assets/quixel/mossy-rock-cluster.glb",
-  englishOak:"./assets/quixel/english-oak.glb",
-  balticPine:"./assets/quixel/baltic-pine.glb",
-  wildGrass:"./assets/quixel/wild-grass.glb"
+const GAME_ASSETS={
+ tree1:"https://cdn.jsdelivr.net/gh/anshaneja5/skyline-run@main/public/assets/models/tree1.glb",
+ tree2:"https://cdn.jsdelivr.net/gh/anshaneja5/skyline-run@main/public/assets/models/tree2.glb",
+ tree3:"https://cdn.jsdelivr.net/gh/anshaneja5/skyline-run@main/public/assets/models/tree3.glb",
+ bush:"https://cdn.jsdelivr.net/gh/anshaneja5/skyline-run@main/public/assets/models/bush.glb",
+ forest:"https://cdn.jsdelivr.net/gh/Station-Sciences/bot-crossing@main/public/assets/forest.glb",
+ crew:"https://cdn.jsdelivr.net/gh/Station-Sciences/bot-crossing@main/public/assets/crew.glb"
 };
-function prepareQuixelModel(root){
-  root.traverse(o=>{
-    if(o.isMesh){
-      o.castShadow=true;o.receiveShadow=true;
-      if(o.material){
-        const ms=Array.isArray(o.material)?o.material:[o.material];
-        ms.forEach(m=>{
-          if("roughness" in m)m.roughness=Math.max(.45,Math.min(.92,m.roughness??.7));
-          if("metalness" in m)m.metalness=Math.min(.08,m.metalness||0);
-          if("envMapIntensity" in m)m.envMapIntensity=1.2;
-        });
-      }
-    }
-  });
+function prepareGameplayModel(root){
+ root.traverse(o=>{
+   if(o.isMesh){
+     o.castShadow=true;o.receiveShadow=true;
+     if(o.material){
+       const ms=Array.isArray(o.material)?o.material:[o.material];
+       ms.forEach(m=>{
+         if("roughness" in m)m.roughness=.72;
+         if("metalness" in m)m.metalness=Math.min(.12,m.metalness||0);
+         if("envMapIntensity" in m)m.envMapIntensity=1.15;
+       });
+     }
+   }
+ });
 }
 function setAssetLoadingMessage(message){
   const boot=document.getElementById("bootDebug");
@@ -262,96 +259,72 @@ function setAssetLoadingMessage(message){
   if(loading) loading.textContent=message;
 }
 function loadGLTF(url){
-  return new Promise((resolve,reject)=>gltfLoader.load(url,resolve,undefined,reject));
+ return new Promise((resolve,reject)=>gltfLoader.load(url,resolve,undefined,reject));
 }
-function addQuixelClone(source,parent,pos,scale=1,rot=0){
-  const c=source.clone(true);c.position.set(...pos);c.rotation.y=rot;c.scale.setScalar(scale);
-  prepareQuixelModel(c);parent.add(c);return c;
+function addAssetClone(source,parent,pos,scale=1,rot=0){
+ const c=source.clone(true);c.position.set(...pos);c.rotation.y=rot;c.scale.setScalar(scale);prepareGameplayModel(c);parent.add(c);return c;
 }
-async function loadQuixelWorld(){
-  setAssetLoadingMessage("VERSION 2026-09-21-D7 · QUIXEL/FAB ASSETS · CHECKING…");
-  try{
-    const entries=Object.entries(QUIXEL_ASSETS);
-    const loaded=await Promise.allSettled(entries.map(([key,url])=>loadGLTF(url).then(v=>({key,url,scene:v.scene,animations:v.animations||[]}))));
-    const ok=loaded.filter(x=>x.status==="fulfilled").map(x=>x.value);
-    const byKey=Object.fromEntries(ok.map(x=>[x.key,x]));
+async function loadRealWorld(){
+ setAssetLoadingMessage("VERSION 2026-09-21-D6 · GAMEPLAY ASSETS · LOADING…");
+ try{
+   const [t1,t2,t3,bush,forest,crew]=await Promise.all([
+     loadGLTF(GAME_ASSETS.tree1),loadGLTF(GAME_ASSETS.tree2),loadGLTF(GAME_ASSETS.tree3),
+     loadGLTF(GAME_ASSETS.bush),loadGLTF(GAME_ASSETS.forest),loadGLTF(GAME_ASSETS.crew)
+   ]);
+   const models=[t1.scene,t2.scene,t3.scene].map(x=>{prepareGameplayModel(x);return x});
+   const bushModel=bush.scene;prepareGameplayModel(bushModel);
 
-    if(!ok.length){
-      throw new Error("Quixel GLB files are not installed yet in assets/quixel/");
-    }
+   // Hide the old primitive scenery once the real game assets arrive.
+   world.traverse(o=>{
+     if(o.userData?.proceduralTree || o.userData?.proceduralRock || o.userData?.proceduralEnvironment) o.visible=false;
+   });
 
-    ok.forEach(x=>prepareQuixelModel(x.scene));
+   // Build a large, varied game-style forest instead of repeating one primitive tree.
+   const forestSpots=[
+     [-18,-8,1.35],[-15,-2,1.05],[-13,5,.95],[-10,11,.85],[-5,14,1.0],[2,14,.92],
+     [8,12,1.05],[13,7,1.15],[17,0,1.3],[16,-8,1.05],[10,-13,.92],[3,-15,1.0],
+     [-5,-15,1.12],[-12,-12,.95],[-19,2,.9],[19,6,.88]
+   ];
+   forestSpots.forEach((p,i)=>addAssetClone(models[i%3],assetRoot,[p[0],0,p[1]],p[2],(i%8)*.55));
 
-    // Remove the previous D6 arbitrary remote game assets if they exist.
-    assetRoot.clear();
+   // Dense meadow edge: bushes fill the gaps between the larger trees.
+   for(let i=0;i<55;i++){
+     const a=i/55*TAU+(i%3)*.11,r=7.5+(i%7)*1.55;
+     addAssetClone(bushModel,assetRoot,[Math.cos(a)*r,.02,Math.sin(a)*r*.68],.42+(i%4)*.09,i*.37);
+   }
 
-    // Keep the symbolic world, but replace the visible environmental language
-    // with coherent photogrammetry assets whenever the corresponding files exist.
-    const trees=[byKey.englishOak,byKey.balticPine].filter(Boolean);
-    const rocks=[byKey.broadleafRock,byKey.nordicRock,byKey.mossyRockCluster].filter(Boolean);
-    const terrain=byKey.forestTerrain;
-    const cliff=byKey.broadleafCliff;
+   // A real forest asset is used as an additional distant silhouette layer.
+   const forestLayer=forest.scene;prepareGameplayModel(forestLayer);
+   forestLayer.scale.setScalar(2.2);forestLayer.position.set(0,-.05,-24);
+   forestLayer.userData.gameplayForest=true;assetRoot.add(forestLayer);
 
-    if(terrain){
-      for(let i=0;i<4;i++){
-        const c=addQuixelClone(terrain.scene,assetRoot,
-          [(i%2?1:-1)*(9+i*2),-.15,-8-i*3],
-          2.0+(i%2)*.35,(i%4)*1.57);
-        c.userData.quixelTerrain=true;
-      }
-    }
+   // Tree of Life: use the same game-ready tree language, enlarged and grouped,
+   // while keeping the symbolic energy nodes/paths around it.
+   const lifeTree=addAssetClone(models[1],assetRoot,[0,.05,0],5.4,.2);
+   lifeTree.name="TreeOfLife_GAMEPLAY_REAL";
+   lifeTree.traverse(o=>{if(o.isMesh)o.frustumCulled=true;});
 
-    const treeSpots=[
-      [-19,-7,1.5],[-16,0,1.25],[-13,7,1.05],[-9,12,.95],[-4,15,1.05],
-      [3,15,.98],[9,12,1.12],[14,7,1.2],[18,0,1.35],[16,-8,1.12],
-      [10,-13,1.0],[4,-15,1.08],[-4,-15,1.2],[-12,-12,1.0]
-    ];
-    if(trees.length){
-      treeSpots.forEach((p,i)=>addQuixelClone(
-        trees[i%trees.length].scene,assetRoot,[p[0],0,p[1]],p[2],i*.53
-      ));
-    }
+   // Visible third-person observer. It moves automatically; there is no input control.
+   gameplayActor=crew.scene.clone(true);
+   gameplayActor.position.copy(observerPos);
+   gameplayActor.scale.setScalar(1.55);
+   gameplayActor.name="ObserverCharacter_REAL";
+   prepareGameplayModel(gameplayActor);
+   assetRoot.add(gameplayActor);
+   if(crew.animations?.length){
+     gameplayMixer=new THREE.AnimationMixer(gameplayActor);
+     const clip=crew.animations.find(a=>/idle|walk|run/i.test(a.name))||crew.animations[0];
+     gameplayMixer.clipAction(clip).play();
+   }
 
-    if(rocks.length){
-      for(let i=0;i<34;i++){
-        const a=i/34*TAU+(i%3)*.16,r=5.5+(i%8)*1.5;
-        addQuixelClone(rocks[i%rocks.length].scene,assetRoot,
-          [Math.cos(a)*r,.02,Math.sin(a)*r*.64],
-          .32+(i%4)*.11,i*.41);
-      }
-    }
-
-    if(cliff){
-      [[-17,-4,1.1],[17,-5,1.05],[-14,8,.8],[15,10,.82]].forEach((p,i)=>
-        addQuixelClone(cliff.scene,assetRoot,[p[0],-.1,p[1]],p[2],i*.8)
-      );
-    }
-
-    // The hero Tree of Life uses the most natural available broadleaf asset,
-    // enlarged and framed by the symbolic energy network.
-    if(trees.length){
-      const hero=addQuixelClone(trees[0].scene,assetRoot,[0,.05,0],4.8,.2);
-      hero.name="TreeOfLife_QUIXEL_HERO";
-    }
-
-    // Restore the observer character as a simple neutral marker, not a player.
-    // It is intentionally procedural so the environment remains Quixel-led.
-    gameplayActor=new THREE.Group();
-    gameplayActor.name="ObserverMarker";
-    const markerMat=new THREE.MeshStandardMaterial({color:0xffd76a,emissive:0xff9d24,emissiveIntensity:.45,roughness:.6});
-    const body=new THREE.Mesh(new THREE.CapsuleGeometry(.22,.65,6,10),markerMat);
-    body.position.y=.72;body.castShadow=true;gameplayActor.add(body);
-    const halo=new THREE.Mesh(new THREE.TorusGeometry(.48,.035,8,32),new THREE.MeshBasicMaterial({color:0xffdf7a,transparent:true,opacity:.8}));
-    halo.rotation.x=Math.PI/2;halo.position.y=.18;gameplayActor.add(halo);
-    assetRoot.add(gameplayActor);
-
-    setAssetLoadingMessage("VERSION 2026-09-21-D7 · QUIXEL/FAB WORLD · "+ok.length+" ASSET TYPES ACTIVE");
-    log("لایهٔ محیطی Quixel/Fab فعال شد؛ مدل‌های ناسازگار قبلی حذف شدند.");
-  }catch(err){
-    console.warn("Quixel local asset layer unavailable; keeping procedural fallback.",err);
-    setAssetLoadingMessage("VERSION 2026-09-21-D7 · QUIXEL ASSETS NOT INSTALLED · FALLBACK");
-    log("فایل‌های Quixel هنوز داخل assets/quixel قرار نگرفته‌اند؛ محیط فعلاً با fallback اجرا می‌شود.");
-  }
+   setAssetLoadingMessage("VERSION 2026-09-21-D6 · GAMEPLAY WORLD · REAL GAME ASSETS ACTIVE");
+   log("مدل‌های واقعی گیم‌پلی فعال شدند: درخت‌های متنوع، بوته‌ها و شخصیت ناظر.");
+ }catch(err){
+   console.warn("Gameplay asset layer unavailable; keeping procedural fallback.",err);
+   const reason=err?.message||String(err);
+   setAssetLoadingMessage("VERSION 2026-09-21-D6 · ASSET ERROR · "+reason);
+   log("مدل‌های گیم‌پلی لود نشدند: "+reason);
+ }
 }
 
 const waterfall=new THREE.Group();world.add(waterfall);
@@ -460,7 +433,7 @@ renderer.domElement.addEventListener("click",e=>{
 });
 
 setStage();log("محیط فانتزی سه‌بعدی آماده شد.");
-loadQuixelWorld();
+loadRealWorld();
 log("دوربین ناظر وارد مسیر گیم‌پلی شد؛ حرکت خودکار و بدون کنترل شخصیت.");log("۱۲ موجود زودیاک، درخت حیات و چرخهٔ حیات فعال شدند.");
 
 function animate(){
