@@ -1,5 +1,5 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.161/build/three.module.js";
-import {OrbitControls} from "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "https://esm.sh/three@0.161.0";
+import {OrbitControls} from "https://esm.sh/three@0.161.0/examples/jsm/controls/OrbitControls.js";
 
 const TAU=Math.PI*2;
 const zodiac=[
@@ -114,10 +114,4 @@ document.querySelectorAll(".actionbar button[data-action]").forEach(b=>b.addEven
 document.getElementById("cameraReset")?.addEventListener("click",()=>document.getElementById("overview").click());
 document.getElementById("zoomIn")?.addEventListener("click",()=>{camera.position.multiplyScalar(.82)});
 document.getElementById("zoomOut")?.addEventListener("click",()=>{camera.position.multiplyScalar(1.22)});
-const oldSetStage=setStage;
-setStage=function(){
-  oldSetStage();
-  if(cycleEnergy)cycleEnergy.style.width=(45+stage/11*45)+"%";
-  if(lifeEnergy)lifeEnergy.style.width=(25+stage/10*70)+"%";
-  logEvent("مرحلهٔ "+(stage+1)+" از چرخه: "+cycleStages[stage][0]);
-};
+
