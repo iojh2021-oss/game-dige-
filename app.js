@@ -23,6 +23,7 @@ camera.position.set(0,10,27);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;
+const gltfLoader=new GLTFLoader();
 const dracoLoader=new DRACOLoader();dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
 const ktx2Loader=new KTX2Loader();ktx2Loader.setTranscoderPath("https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/libs/basis/");ktx2Loader.detectSupport(renderer);gltfLoader.setDRACOLoader(dracoLoader);gltfLoader.setKTX2Loader(ktx2Loader);
 document.getElementById("canvasWrap").appendChild(renderer.domElement);
@@ -200,6 +201,36 @@ function animateLiving(now){
 }
 animateLiving(performance.now());
 
+
+/* ===== LICENSED/FREE REMOTE ASSET LIBRARY ===== */
+const ASSET_BASE="https://raw.githubusercontent.com/agentkaerf/FreeModels/main/";
+const ANIMAL_BASE=ASSET_BASE+"Ultimate%20Animated%20Animals%20-%20July%202021/glTF/";
+const NATURE_BASE=ASSET_BASE+"Stylized%20Nature%20MegaKit%5BStandard%5D/glTF/";
+const externalAssets=new THREE.Group();world.add(externalAssets);
+const externalMixers=[];
+function loadRemoteGLTF(url,pos,scale,rot=0){
+  gltfLoader.load(url,(g)=>{
+    const root=g.scene;root.position.set(...pos);root.scale.setScalar(scale);root.rotation.y=rot;
+    root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if("envMapIntensity" in m)m.envMapIntensity=1.15})}}});
+    externalAssets.add(root);
+    if(g.animations?.length){const mixer=new THREE.AnimationMixer(root);g.animations.forEach((clip,i)=>mixer.clipAction(clip).play());externalMixers.push(mixer)}
+  },undefined,()=>{});
+}
+[
+ ["CommonTree_1.gltf",[-10,.1,-3],1.65,.2],["CommonTree_2.gltf",[-6,.1,-5],1.5,-.3],
+ ["CommonTree_3.gltf",[8,.1,-5],1.7,.4],["Bush_Common.gltf",[4,.05,-1],1.8,0],
+ ["Bush_Common_Flowers.gltf",[-3,.05,-2],1.6,.5]
+].forEach(x=>loadRemoteGLTF(NATURE_BASE+x[0],x[1],x[2],x[3]));
+[
+ ["Alpaca.gltf",[-6,.2,2],.62,.4],["Bull.gltf",[-3,.2,4],.55,1.2],
+ ["Cow.gltf",[2,.2,4],.55,-.5],["Deer.gltf",[6,.2,2],.58,2],
+ ["Donkey.gltf",[-7,.2,-1],.52,.8],["Fox.gltf",[7,.2,-1],.5,-.8],
+ ["Horse.gltf",[0,.2,6],.58,3],["Stag.gltf",[9,.2,4],.58,2.4],
+ ["Wolf.gltf",[-9,.2,4],.52,.1],["Husky.gltf",[4,.2,6],.5,2.7],
+ ["ShibaInu.gltf",[-4,.2,6],.5,.6],["Horse_White.gltf",[1,.2,-4],.58,1.5]
+].forEach(x=>loadRemoteGLTF(ANIMAL_BASE+x[0],x[1],x[2],x[3]));
+function updateExternalAssets(dt){externalMixers.forEach(m=>m.update(dt*speed))}
+
 /* ===== COMPLETE MMO OBSERVER VISUAL PASS ===== */
 const visualState={day:0,generation:1,event:0};
 const selectedGlow=new THREE.Mesh(new THREE.RingGeometry(.7,.76,48),new THREE.MeshBasicMaterial({color:0xffe36a,transparent:true,opacity:.85,side:THREE.DoubleSide}));
@@ -217,7 +248,7 @@ let lifeEventIndex=0,lifeEventClock=0;
 function advanceLifeEvent(dt){lifeEventClock+=dt*speed;if(lifeEventClock<4.2)return;lifeEventClock=0;lifeEventIndex=(lifeEventIndex+1)%lifeEvents.length;visualState.generation++;logEvent(lifeEvents[lifeEventIndex][0]+" — "+lifeEvents[lifeEventIndex][1])}
 function polishAsset(root){root.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.receiveShadow=true;if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if("roughness" in m)m.roughness=Math.min(.85,Math.max(.18,m.roughness??.55));if("envMapIntensity" in m)m.envMapIntensity=1.25})}})}
 function animateVisualPass(dt,now){
-  loadedActors.forEach(a=>{if(!a.root.userData.polished){polishAsset(a.root);a.root.userData.polished=true}});
+  loadedActors.forEach(a=>{if(!a.root.userData.polished){polishAsset(a.root);a.root.userData.polished=true}});updateExternalAssets(dt);
   visualState.day=(visualState.day+dt*speed*.018)%1;
   const sunAngle=visualState.day*TAU;
   sun.position.set(Math.cos(sunAngle)*18,11+Math.sin(sunAngle)*9,Math.sin(sunAngle)*8);sunLight.position.copy(sun.position);
