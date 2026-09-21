@@ -182,6 +182,7 @@ function animateLiving(now){
   birds.forEach((b,i)=>{const a=now*.00012*(1+i%3)+b.phase;b.g.position.x=Math.cos(a)*12;b.g.position.z=Math.sin(a)*7;b.g.position.y=7+Math.sin(a*2)*1.2;b.g.rotation.y=-a;b.g.children[0].rotation.z=Math.sin(now*.008+i)*.5;b.g.children[1].rotation.z=-Math.sin(now*.008+i)*.5});
   rippleGroup.children.forEach((q,i)=>{q.scale.setScalar(1+((now*.0004+i*.13)%1)*.6);q.material.opacity=.3-(q.scale.x-1)*.25});
   sunLight.intensity=180+Math.sin(now*.00035)*35;sun.scale.setScalar(1+Math.sin(now*.001)*.025);
+  updateAssetLife(dt,now);
   worldClock+=dt;
   // Day/night is symbolic and slow; the solar wheel remains the source of the cycle.
   const daylight=(Math.sin(worldClock*.045)+1)/2;
