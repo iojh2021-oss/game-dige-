@@ -18,20 +18,22 @@ const stages=[
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x4b9fd0);
 scene.fog=new THREE.FogExp2(0x78b9cf,.014);
-const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,180);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,220);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.32;
-document.getElementById("canvasWrap").appendChild(renderer.domElement); const boot=document.getElementById("bootDebug"); if(boot) boot.textContent="VERSION 2026-09-21-D4 · REAL 3D ASSETS · LOADING";
+renderer.toneMappingExposure=1.48;
+document.getElementById("canvasWrap").appendChild(renderer.domElement); const boot=document.getElementById("bootDebug"); if(boot) boot.textContent="VERSION 2026-09-21-D5 · GAMEPLAY WORLD · LOADING";
 
 const clock=new THREE.Clock();
 let time=0,stage=0,stageTimer=0,running=true,speed=1,cycle=0;
-let camYaw=0,camPitch=.12,camDist=31,dragging=false,lastX=0,lastY=0;
+let camYaw=0,camPitch=.12,camDist=18,dragging=false,lastX=0,lastY=0;
+let observerT=.08,cinematicObserver=true;
+const observerPos=new THREE.Vector3(),observerLook=new THREE.Vector3();
 const world=new THREE.Group();scene.add(world);
 const assetRoot=new THREE.Group();assetRoot.name="REAL_ASSETS";world.add(assetRoot);
 const gltfLoader=new GLTFLoader();
@@ -69,9 +71,9 @@ function skyTexture(){
 const sky=new THREE.Mesh(new THREE.SphereGeometry(70,32,16),new THREE.MeshBasicMaterial({map:skyTexture(),side:THREE.BackSide}));
 scene.add(sky);
 
-const ground=new THREE.Mesh(new THREE.CylinderGeometry(28,28,1.5,96),mats.grass);
+const ground=new THREE.Mesh(new THREE.CylinderGeometry(38,38,1.5,128),mats.grass);
 ground.position.y=-.65;ground.receiveShadow=true;world.add(ground);
-const field=new THREE.Mesh(new THREE.CircleGeometry(24,96),mats.grass2);
+const field=new THREE.Mesh(new THREE.CircleGeometry(34,128),mats.grass2);
 field.rotation.x=-Math.PI/2;field.position.y=-.02;field.receiveShadow=true;world.add(field);
 const dirt=new THREE.Mesh(new THREE.RingGeometry(5.0,15.5,96),mats.soil);
 dirt.rotation.x=-Math.PI/2;dirt.position.y=.035;world.add(dirt);
@@ -302,7 +304,7 @@ async function loadRealWorld(){
      addRealClone(boulderModel,assetRoot,[Math.cos(a)*r,.15,Math.sin(a)*r*.58],.32+(i%3)*.11,a);
    }
 
-   setAssetLoadingMessage("VERSION 2026-09-21-D4 · REAL 3D ASSETS ACTIVE");
+   setAssetLoadingMessage("VERSION 2026-09-21-D5 · GAMEPLAY WORLD · REAL 3D ASSETS ACTIVE");
    log("مدل‌های واقعی درخت، صخره و سنگ از Poly Haven بارگذاری شدند.");
  }catch(err){
    console.warn("Real asset layer unavailable; keeping procedural fallback.",err);
@@ -319,11 +321,50 @@ const eventLog=document.getElementById("eventLog"),detail=document.getElementByI
 function fa(v){return String(v).replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[d])}
 function log(t){if(!eventLog)return;const p=document.createElement("p");p.textContent="• "+t;eventLog.prepend(p);while(eventLog.children.length>3)eventLog.lastElementChild.remove()}
 function setStage(){const s=stages[stage];chapter.textContent=s[0];chapterSub.textContent=s[1];focusName.textContent=s[0];focusText.textContent=s[1]+" این نمایش یک چرخهٔ نمادین و هنری است.";stageNo.textContent=fa((stage+1)+" / "+stages.length);bar.style.width=((stage+1)/stages.length*100)+"%";nodes.forEach((n,i)=>n.scale.setScalar(i===stage%10?1.5:1));zodiacObjects.forEach((o,i)=>o.scale.setScalar(i===stage%12?1.2:1))}
+
+/* GAMEPLAY-STYLE OBSERVER PATH
+   The camera behaves like a third-person adventure-game spectator:
+   low to the ground, forward-facing, moving through the world automatically.
+*/
+const observerPath=new THREE.CatmullRomCurve3([
+ new THREE.Vector3(0,1.45,18),
+ new THREE.Vector3(-9,1.45,13),
+ new THREE.Vector3(-15,1.45,3),
+ new THREE.Vector3(-10,1.45,-7),
+ new THREE.Vector3(0,1.45,-12),
+ new THREE.Vector3(11,1.45,-8),
+ new THREE.Vector3(15,1.45,1),
+ new THREE.Vector3(9,1.45,12),
+ new THREE.Vector3(0,1.45,18)
+],true,"catmullrom",.55);
+
+const trailCurve=new THREE.CatmullRomCurve3([
+ new THREE.Vector3(0,.045,19),new THREE.Vector3(-8,.045,14),new THREE.Vector3(-13,.045,5),
+ new THREE.Vector3(-8,.045,-5),new THREE.Vector3(0,.045,-10),new THREE.Vector3(9,.045,-6),
+ new THREE.Vector3(13,.045,3),new THREE.Vector3(7,.045,12),new THREE.Vector3(0,.045,19)
+],true,"catmullrom",.55);
+const trail=new THREE.Mesh(
+ new THREE.TubeGeometry(trailCurve,180,1.05,8,true),
+ new THREE.MeshStandardMaterial({color:0x8c6a43,roughness:1})
+);
+trail.name="AdventureTrail";
+trail.receiveShadow=true;
+world.add(trail);
+
+function updateObserver(dt){
+ if(!cinematicObserver)return;
+ observerT=(observerT+dt*.012*speed)%1;
+ observerPath.getPointAt(observerT,observerPos);
+ observerPath.getPointAt((observerT+.012)%1,observerLook);
+ observerLook.y+=2.1;
+}
+
 function cameraUpdate(){
  const target=new THREE.Vector3(0,6.8,0);
  const x=Math.sin(camYaw)*Math.cos(camPitch)*camDist,y=target.y+Math.sin(camPitch)*camDist,z=Math.cos(camYaw)*Math.cos(camPitch)*camDist;
  camera.position.set(x,y,z);camera.lookAt(target);
 }
+updateObserver(0);
 cameraUpdate();
 
 renderer.domElement.addEventListener("pointerdown",e=>{dragging=true;lastX=e.clientX;lastY=e.clientY});
@@ -332,12 +373,12 @@ addEventListener("pointermove",e=>{if(!dragging)return;camYaw-=(e.clientX-lastX)
 renderer.domElement.addEventListener("wheel",e=>{camDist=Math.max(18,Math.min(42,camDist+e.deltaY*.015))},{passive:true});
 
 function focus(kind){
- if(kind==="sun"){camDist=22;camPitch=.35;chapter.textContent="خورشید";chapterSub.textContent="منبع نور نمادین"}
- if(kind==="zodiac"){camDist=24;camPitch=.3;chapter.textContent="۱۲ زودیاک";chapterSub.textContent="حلقهٔ خورشیدی"}
- if(kind==="tree"){camDist=18;camPitch=.28;chapter.textContent="درخت حیات";chapterSub.textContent="تاج · ریشه · مسیرهای نور"}
- if(kind==="earth"){camDist=30;camPitch=.12;chapter.textContent="زمین";chapterSub.textContent="محیط زنده و طبیعی"}
- if(kind==="life"){camDist=21;camPitch=.18;chapter.textContent="حیات";chapterSub.textContent="حرکت و زایش"}
- if(kind==="cycle"){camDist=31;camPitch=.12;chapter.textContent="چرخهٔ کامل";chapterSub.textContent="خورشید → زودیاک → درخت → زمین → حیات"}
+ if(kind==="sun"){cinematicObserver=false;camDist=22;camPitch=.35;chapter.textContent="خورشید";chapterSub.textContent="منبع نور نمادین"}
+ if(kind==="zodiac"){cinematicObserver=false;camDist=24;camPitch=.3;chapter.textContent="۱۲ زودیاک";chapterSub.textContent="حلقهٔ خورشیدی"}
+ if(kind==="tree"){cinematicObserver=false;camDist=18;camPitch=.28;chapter.textContent="درخت حیات";chapterSub.textContent="تاج · ریشه · مسیرهای نور"}
+ if(kind==="earth"){cinematicObserver=false;camDist=24;camPitch=.12;chapter.textContent="زمین";chapterSub.textContent="محیط زنده و طبیعی"}
+ if(kind==="life"){cinematicObserver=false;camDist=20;camPitch=.18;chapter.textContent="حیات";chapterSub.textContent="حرکت و زایش"}
+ if(kind==="cycle"){cinematicObserver=true;camDist=16;camPitch=.10;chapter.textContent="چرخهٔ کامل";chapterSub.textContent="نمای گیم‌پلی ناظر · خورشید → زودیاک → درخت → زمین → حیات"}
  cameraUpdate();log("نمای «"+chapter.textContent+"» انتخاب شد.");
 }
 document.querySelectorAll(".actionbar button[data-action]").forEach(b=>b.onclick=()=>focus(b.dataset.action));
@@ -364,7 +405,8 @@ renderer.domElement.addEventListener("click",e=>{
 });
 
 setStage();log("محیط فانتزی سه‌بعدی آماده شد.");
-loadRealWorld();log("۱۲ موجود زودیاک، درخت حیات و چرخهٔ حیات فعال شدند.");
+loadRealWorld();
+log("دوربین ناظر وارد مسیر گیم‌پلی شد؛ حرکت خودکار و بدون کنترل شخصیت.");log("۱۲ موجود زودیاک، درخت حیات و چرخهٔ حیات فعال شدند.");
 
 function animate(){
  requestAnimationFrame(animate);
@@ -373,6 +415,7 @@ function animate(){
   stageTimer+=dt*speed;
   if(stageTimer>3.4){stageTimer=0;stage++;if(stage>=stages.length){stage=0;cycle++;log("چرخهٔ شمارهٔ "+fa(cycle)+" آغاز شد.")}setStage()}
  }
+ updateObserver(dt);
  const day=(Math.sin(time*.045)+1)/2;
  const sunA=time*.018*TAU;
  sun.position.set(Math.cos(sunA)*18,18+Math.sin(sunA)*3,-11);
