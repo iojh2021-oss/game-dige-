@@ -252,6 +252,12 @@ function prepareGameplayModel(root){
    }
  });
 }
+function setAssetLoadingMessage(message){
+  const boot=document.getElementById("bootDebug");
+  if(boot) boot.textContent=message;
+  const loading=document.querySelector("#loading b");
+  if(loading) loading.textContent=message;
+}
 function loadGLTF(url){
  return new Promise((resolve,reject)=>gltfLoader.load(url,resolve,undefined,reject));
 }
