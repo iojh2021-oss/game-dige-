@@ -1,5 +1,6 @@
 import * as THREE from "https://esm.sh/three@0.161.0";
 import {OrbitControls} from "https://esm.sh/three@0.161.0/examples/jsm/controls/OrbitControls.js";
+import {GLTFLoader} from "https://esm.sh/three@0.161.0/examples/jsm/loaders/GLTFLoader.js";
 
 const TAU=Math.PI*2;
 const zodiac=[
@@ -181,5 +182,15 @@ function animateLiving(now){
   birds.forEach((b,i)=>{const a=now*.00012*(1+i%3)+b.phase;b.g.position.x=Math.cos(a)*12;b.g.position.z=Math.sin(a)*7;b.g.position.y=7+Math.sin(a*2)*1.2;b.g.rotation.y=-a;b.g.children[0].rotation.z=Math.sin(now*.008+i)*.5;b.g.children[1].rotation.z=-Math.sin(now*.008+i)*.5});
   rippleGroup.children.forEach((q,i)=>{q.scale.setScalar(1+((now*.0004+i*.13)%1)*.6);q.material.opacity=.3-(q.scale.x-1)*.25});
   sunLight.intensity=180+Math.sin(now*.00035)*35;sun.scale.setScalar(1+Math.sin(now*.001)*.025);
+  worldClock+=dt;
+  // Day/night is symbolic and slow; the solar wheel remains the source of the cycle.
+  const daylight=(Math.sin(worldClock*.045)+1)/2;
+  scene.background.lerpColors(new THREE.Color(0x020a18),new THREE.Color(0x071d36),daylight*.35);
+  ambient.intensity=1.7+daylight*.9;
+  loadedActors.forEach((a,i)=>{a.mixer.update(dt*speed);a.root.position.y+=Math.sin(now*.0012+a.phase)*.0008;a.root.rotation.y+=dt*(i%2?-.06:.04)});
+  streamParticles.forEach((p,i)=>{p.userData.t=(p.userData.t+p.userData.speed*dt)%1;const t=p.userData.t;const a=p.userData.offset+t*TAU*2;const rr=.35+Math.sin(t*Math.PI)*1.3;p.position.set(Math.cos(a)*rr,t*7+.7,Math.sin(a)*rr*.5);p.scale.setScalar(.6+Math.sin(t*Math.PI)*1.6);});
+  growthBeds.forEach(g=>{g.mesh.scale.y=.25+.8*(.5+.5*Math.sin(worldClock*.55+g.phase));});
+  zodiacPulse.forEach((r,i)=>{const q=.82+.18*Math.sin(now*.002+i);r.scale.setScalar(q);r.material.opacity=.35+.3*q;});
+
 }
 animateLiving(performance.now());
