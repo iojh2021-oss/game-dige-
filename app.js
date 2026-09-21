@@ -1,4 +1,5 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/loaders/GLTFLoader.js";
 
 const TAU=Math.PI*2;
 const zodiac=[
@@ -26,12 +27,14 @@ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.32;
-document.getElementById("canvasWrap").appendChild(renderer.domElement); const boot=document.getElementById("bootDebug"); if(boot) boot.textContent="VERSION 2026-09-21-D3 · CINEMATIC WORLD · 3D RUNNING";
+document.getElementById("canvasWrap").appendChild(renderer.domElement); const boot=document.getElementById("bootDebug"); if(boot) boot.textContent="VERSION 2026-09-21-D4 · REAL 3D ASSETS · LOADING";
 
 const clock=new THREE.Clock();
 let time=0,stage=0,stageTimer=0,running=true,speed=1,cycle=0;
 let camYaw=0,camPitch=.12,camDist=31,dragging=false,lastX=0,lastY=0;
 const world=new THREE.Group();scene.add(world);
+const assetRoot=new THREE.Group();assetRoot.name="REAL_ASSETS";world.add(assetRoot);
+const gltfLoader=new GLTFLoader();
 const mats={};
 const mat=(c,r=.8,e=0,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,emissive:e?c:0,emissiveIntensity:e});
 Object.assign(mats,{
@@ -74,7 +77,7 @@ const dirt=new THREE.Mesh(new THREE.RingGeometry(5.0,15.5,96),mats.soil);
 dirt.rotation.x=-Math.PI/2;dirt.position.y=.035;world.add(dirt);
 
 function mountain(x,z,s){
- const g=new THREE.Group();g.position.set(x,0,z);
+ const g=new THREE.Group();g.userData.proceduralEnvironment=true;g.position.set(x,0,z);
  cone(g,5*s,8*s,mat(0x426b66,.98),0,4*s,0,6);
  cone(g,3.3*s,5.5*s,mat(0x63877b,.98),0,4.3*s,.1,7);
  cone(g,1.1*s,2*s,mat(0xe8e5d2,.9),0,6.7*s,.15,6);
@@ -83,7 +86,7 @@ function mountain(x,z,s){
 mountain(-18,-15,1.2);mountain(-8,-20,.9);mountain(8,-20,1.05);mountain(18,-14,1.25);
 
 function tree(x,z,s=1){
- const g=new THREE.Group();g.position.set(x,.05,z);g.scale.setScalar(s);
+ const g=new THREE.Group();g.userData.proceduralTree=true;g.position.set(x,.05,z);g.scale.setScalar(s);
  cyl(g,.3,.42,3.1,mats.trunk,0,1.55,0,9);
  for(let i=0;i<6;i++)sph(g,.85,i%2?mats.leaf:mats.leaf2,(Math.random()-.5)*1.15,2.7+Math.random()*1.1,(Math.random()-.5)*.85);
  world.add(g);return g;
@@ -93,7 +96,7 @@ for(let i=0;i<30;i++){const a=i/30*TAU+(Math.random()-.5)*.12,r=15+Math.random()
 for(let i=0;i<48;i++){
  const a=Math.random()*TAU,r=4+Math.random()*12;
  const g=new THREE.Group();g.position.set(Math.cos(a)*r,.25,Math.sin(a)*r*.62);
- const s=sph(g,.25+Math.random()*.35,mats.stone,0,0,0);s.rotation.set(Math.random(),Math.random(),Math.random());world.add(g);
+ g.userData.proceduralRock=true;const s=sph(g,.25+Math.random()*.35,mats.stone,0,0,0);s.rotation.set(Math.random(),Math.random(),Math.random());world.add(g);
 }
 for(let i=0;i<90;i++){
  const a=Math.random()*TAU,r=3+Math.random()*13,g=new THREE.Group();
@@ -109,7 +112,7 @@ pond.rotation.x=-Math.PI/2;pond.position.set(-8,.2,-4);world.add(pond);
 
 // CINEMATIC LANDSCAPE LAYER
 function cliff(x,z,s){
- const g=new THREE.Group();g.position.set(x,-.1,z);g.scale.setScalar(s);
+ const g=new THREE.Group();g.userData.proceduralEnvironment=true;g.position.set(x,-.1,z);g.scale.setScalar(s);
  const rock=mat(0x3d665f,.98);
  const top=mat(0x6e8c6c,.92);
  cone(g,4.8,6.5,rock,0,3.1,0,7);
@@ -217,6 +220,97 @@ for(let i=0;i<10;i++){const a=animal(i),ang=i/10*TAU,r=4.7+Math.random()*4;a.pos
 
 const flowers=new THREE.Group();world.add(flowers);
 for(let i=0;i<32;i++){const a=Math.random()*TAU,r=3+Math.random()*11;sph(flowers,.11,mats.flower,Math.cos(a)*r,.42,Math.sin(a)*r*.58)}
+
+/* REAL 3D ASSET LAYER
+   Uses Poly Haven's public API to resolve CC0 glTF assets at runtime.
+   If the CDN/API is unavailable, the procedural scene remains as a safe fallback.
+*/
+function setAssetLoadingMessage(text){
+ const el=document.getElementById("bootDebug"); if(el) el.textContent=text;
+}
+async function resolvePolyhavenGLTF(assetId,resolution="1k"){
+ const r=await fetch("https://api.polyhaven.com/files/"+assetId,{headers:{Accept:"application/json"}});
+ if(!r.ok) throw new Error("Poly Haven API "+r.status);
+ const data=await r.json();
+ const block=data.gltf?.[resolution];
+ const file=block?.gltf || block;
+ if(!file?.url) throw new Error("No glTF URL for "+assetId);
+ return file.url;
+}
+function prepareRealModel(root){
+ root.traverse(o=>{
+   if(o.isMesh){
+     o.castShadow=true;o.receiveShadow=true;
+     if(o.material){
+       const materials=Array.isArray(o.material)?o.material:[o.material];
+       materials.forEach(m=>{
+         if("roughness" in m) m.roughness=Math.min(.9,Math.max(.28,m.roughness??.65));
+         if("envMapIntensity" in m) m.envMapIntensity=1.15;
+       });
+     }
+   }
+ });
+}
+function addRealClone(source,parent,position,scale=1,rotationY=0){
+ const c=source.clone(true);
+ c.position.set(...position);c.rotation.y=rotationY;c.scale.setScalar(scale);
+ prepareRealModel(c);parent.add(c);return c;
+}
+async function loadRealWorld(){
+ setAssetLoadingMessage("VERSION 2026-09-21-D4 · بارگذاری مدل‌های سه‌بعدی واقعی…");
+ try{
+   const [treeUrl,islandUrl,mountainUrl,boulderUrl]=await Promise.all([
+     resolvePolyhavenGLTF("tree_small_02","1k"),
+     resolvePolyhavenGLTF("island_tree_02","1k"),
+     resolvePolyhavenGLTF("mountainside","1k"),
+     resolvePolyhavenGLTF("boulder_01","1k")
+   ]);
+   const [treeData,islandData,mountainData,boulderData]=await Promise.all([
+     new Promise((res,rej)=>gltfLoader.load(treeUrl,res,undefined,rej)),
+     new Promise((res,rej)=>gltfLoader.load(islandUrl,res,undefined,rej)),
+     new Promise((res,rej)=>gltfLoader.load(mountainUrl,res,undefined,rej)),
+     new Promise((res,rej)=>gltfLoader.load(boulderUrl,res,undefined,rej))
+   ]);
+   const treeModel=treeData.scene,islandModel=islandData.scene,mountainModel=mountainData.scene,boulderModel=boulderData.scene;
+   prepareRealModel(treeModel);prepareRealModel(islandModel);prepareRealModel(mountainModel);prepareRealModel(boulderModel);
+
+   // Replace the primitive environmental stand-ins once real assets are ready.
+   world.traverse(o=>{
+     if(o.userData?.proceduralTree || o.userData?.proceduralRock || o.userData?.proceduralEnvironment) o.visible=false;
+   });
+
+   // Main Tree of Life: a real scanned/natural tree model, then augmented with the symbolic energy network.
+   const lifeReal=addRealClone(islandModel,assetRoot,[0,0,0],1.9,0.25);
+   lifeReal.name="TreeOfLife_REAL";
+   lifeReal.traverse(o=>{if(o.isMesh)o.frustumCulled=true;});
+
+   // Natural forest ring.
+   const forest=[
+     [-15,-7,.9],[-12,2,.72],[-9,9,.65],[-4,12,.78],[5,12,.72],[11,8,.82],[15,1,.9],
+     [15,-8,.76],[10,-12,.72],[4,-14,.68],[-5,-14,.78],[-12,-11,.72]
+   ];
+   forest.forEach((p,i)=>addRealClone(treeModel,assetRoot,p,p[2],(i%7)*.65));
+
+   // Real cliff faces to frame the valley.
+   [[-17,-10,1.35,.25],[17,-9,1.25,-.45],[-18,2,.95,.15],[18,3,.9,-.25]].forEach(p=>{
+     addRealClone(mountainModel,assetRoot,[p[0],0,p[1]],p[2],p[3]);
+   });
+
+   // Real rocks around the river/forest.
+   for(let i=0;i<18;i++){
+     const a=i/18*TAU+.4,r=8.5+(i%5)*1.6;
+     addRealClone(boulderModel,assetRoot,[Math.cos(a)*r,.15,Math.sin(a)*r*.58],.32+(i%3)*.11,a);
+   }
+
+   setAssetLoadingMessage("VERSION 2026-09-21-D4 · REAL 3D ASSETS ACTIVE");
+   log("مدل‌های واقعی درخت، صخره و سنگ از Poly Haven بارگذاری شدند.");
+ }catch(err){
+   console.warn("Real asset layer unavailable; keeping procedural fallback.",err);
+   setAssetLoadingMessage("VERSION 2026-09-21-D4 · 3D WORLD RUNNING · FALLBACK");
+   log("مدل‌های آنلاین در دسترس نبودند؛ نمای جایگزین فعال ماند.");
+ }
+}
+
 const waterfall=new THREE.Group();world.add(waterfall);
 for(let i=0;i<6;i++){const w=new THREE.Mesh(new THREE.PlaneGeometry(.7,4.5),new THREE.MeshBasicMaterial({color:0x91e6ff,transparent:true,opacity:.5,side:THREE.DoubleSide}));w.position.set(-9+i*3.6,2.3,-8.2);waterfall.add(w)}
 
@@ -269,7 +363,8 @@ renderer.domElement.addEventListener("click",e=>{
  else openDetail("موجود زنده","بخشی از چرخهٔ خودکار محیط.",["حرکت خودکار","نقش: حیات زمینی","کنترل بازیکن: ندارد"]);
 });
 
-setStage();log("محیط فانتزی سه‌بعدی آماده شد.");log("۱۲ موجود زودیاک، درخت حیات و چرخهٔ حیات فعال شدند.");
+setStage();log("محیط فانتزی سه‌بعدی آماده شد.");
+loadRealWorld();log("۱۲ موجود زودیاک، درخت حیات و چرخهٔ حیات فعال شدند.");
 
 function animate(){
  requestAnimationFrame(animate);
