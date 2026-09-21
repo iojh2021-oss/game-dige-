@@ -259,7 +259,7 @@ function addRealClone(source,parent,position,scale=1,rotationY=0){
  prepareRealModel(c);parent.add(c);return c;
 }
 async function loadRealWorld(){
- setAssetLoadingMessage("VERSION 2026-09-21-D4 · بارگذاری مدل‌های سه‌بعدی واقعی…");
+ setAssetLoadingMessage("VERSION 2026-09-21-D5 · بارگذاری مدل‌های سه‌بعدی واقعی…");
  try{
    const [treeUrl,islandUrl,mountainUrl,boulderUrl]=await Promise.all([
      resolvePolyhavenGLTF("tree_small_02","1k"),
@@ -308,8 +308,9 @@ async function loadRealWorld(){
    log("مدل‌های واقعی درخت، صخره و سنگ از Poly Haven بارگذاری شدند.");
  }catch(err){
    console.warn("Real asset layer unavailable; keeping procedural fallback.",err);
-   setAssetLoadingMessage("VERSION 2026-09-21-D4 · 3D WORLD RUNNING · FALLBACK");
-   log("مدل‌های آنلاین در دسترس نبودند؛ نمای جایگزین فعال ماند.");
+   const reason=err?.message||String(err);
+   setAssetLoadingMessage("VERSION 2026-09-21-D5 · FALLBACK · "+reason);
+   log("مدل‌های واقعی لود نشدند: "+reason);
  }
 }
 
