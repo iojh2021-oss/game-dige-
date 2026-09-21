@@ -115,3 +115,71 @@ document.getElementById("cameraReset")?.addEventListener("click",()=>document.ge
 document.getElementById("zoomIn")?.addEventListener("click",()=>{camera.position.multiplyScalar(.82)});
 document.getElementById("zoomOut")?.addEventListener("click",()=>{camera.position.multiplyScalar(1.22)});
 
+
+
+/* ===== LIVING WORLD EXTENSION =====
+   Stylized MMO-like observer world. External production assets are referenced
+   in README; this fallback geometry keeps the world playable without downloads. */
+const living=[];
+const env=new THREE.Group(); world.add(env);
+
+function simpleTree(x,z,s=1){
+  const g=new THREE.Group(); g.position.set(x,.15,z); g.scale.setScalar(s);
+  const t=new THREE.Mesh(new THREE.CylinderGeometry(.16,.28,2.1,9),mat(0x68402b)); t.position.y=1; t.castShadow=true; g.add(t);
+  for(let k=0;k<5;k++){const c=new THREE.Mesh(new THREE.IcosahedronGeometry(.65,1),mat([0x3d9b51,0x58b84e,0x2f7f46][k%3])); c.position.set((Math.random()-.5)*.7,1.8+Math.random()*.8,(Math.random()-.5)*.7); c.scale.y=.8; c.castShadow=true; g.add(c)}
+  env.add(g); living.push({g,type:"tree",phase:Math.random()*TAU});
+}
+for(let i=0;i<34;i++){const a=Math.random()*TAU,r=7+Math.random()*5;simpleTree(Math.cos(a)*r,Math.sin(a)*r*.55,.65+Math.random()*.65)}
+
+function rock(x,z,s=1){const r=new THREE.Mesh(new THREE.DodecahedronGeometry(.35*s,1),stone);r.position.set(x,.28*s,z);r.rotation.set(Math.random(),Math.random(),Math.random());r.castShadow=true;env.add(r)}
+for(let i=0;i<45;i++){const a=Math.random()*TAU,r=4+Math.random()*8;rock(Math.cos(a)*r,Math.sin(a)*r*.58,.4+Math.random()*.9)}
+
+function plant(x,z,c=0x6dcf5a){const g=new THREE.Group();g.position.set(x,.25,z);const stem=new THREE.Mesh(new THREE.CylinderGeometry(.025,.035,.5,6),mat(0x3e873b));stem.position.y=.25;g.add(stem);for(let i=0;i<4;i++){const l=new THREE.Mesh(new THREE.SphereGeometry(.13,7,5),mat(c));l.scale.set(.8,.3,1);l.position.set((i-1.5)*.09,.5+Math.random()*.15,(Math.random()-.5)*.12);g.add(l)}env.add(g);living.push({g,type:"plant",phase:Math.random()*TAU})}
+for(let i=0;i<110;i++){const a=Math.random()*TAU,r=1+Math.random()*9;plant(Math.cos(a)*r,Math.sin(a)*r*.6,[0x6fcf55,0x88d65a,0x3fae64][i%3])}
+
+const skyCycle=new THREE.Group();scene.add(skyCycle);
+for(let i=0;i<5;i++){const c=new THREE.Mesh(new THREE.SphereGeometry(1.3+Math.random()*.8,12,8),new THREE.MeshStandardMaterial({color:0x8ec8e8,transparent:true,opacity:.12,depthWrite:false}));c.position.set(-18+i*9,14+Math.sin(i)*3,-12-i*2);skyCycle.add(c)}
+
+function zodiacAvatar(kind){
+  const g=new THREE.Group();
+  const body=mat(0xd89b43,.45,.05,.05), dark=mat(0x5d3b25,.5), whiteM=mat(0xf4ead5,.5);
+  const b=new THREE.Mesh(new THREE.SphereGeometry(.34,12,10),body);b.scale.set(1.25,.85,.85);g.add(b);
+  const h=new THREE.Mesh(new THREE.SphereGeometry(.24,12,10),body);h.position.z=.38;h.position.y=.05;g.add(h);
+  if(kind===0){for(const s of[-1,1]){const horn=new THREE.Mesh(new THREE.TorusGeometry(.18,.045,6,12,Math.PI),dark);horn.position.set(s*.18,.25,.36);horn.rotation.x=Math.PI/2;g.add(horn)}}
+  if(kind===1){const horn1=new THREE.Mesh(new THREE.ConeGeometry(.08,.5,8),dark);horn1.position.set(-.16,.48,.34);horn1.rotation.z=-.3;g.add(horn1);const horn2=horn1.clone();horn2.position.x=.16;horn2.rotation.z=.3;g.add(horn2)}
+  if(kind===2){const h2=h.clone();h2.position.x=.34;h2.position.z=.28;g.add(h2)}
+  if(kind===3){const cl=new THREE.Mesh(new THREE.TorusGeometry(.2,.07,7,12),body);cl.position.set(.28,0,.34);cl.rotation.y=Math.PI/2;g.add(cl)}
+  if(kind===4){const mane=new THREE.Mesh(new THREE.TorusGeometry(.3,.09,8,16),gold);mane.position.z=.38;g.add(mane)}
+  if(kind===5){const horn=new THREE.Mesh(new THREE.ConeGeometry(.07,.5,7),dark);horn.position.set(.15,.42,.35);horn.rotation.z=.35;g.add(horn)}
+  if(kind===6){const arm=new THREE.Mesh(new THREE.TorusGeometry(.3,.045,6,24),gold);arm.rotation.z=Math.PI/2;arm.position.y=.05;g.add(arm)}
+  if(kind===7){const st=new THREE.Mesh(new THREE.TorusGeometry(.22,.06,7,18),dark);st.position.z=.4;st.rotation.x=Math.PI/2;g.add(st)}
+  if(kind===8){const bow=new THREE.Mesh(new THREE.TorusGeometry(.32,.045,6,24,Math.PI),gold);bow.rotation.y=Math.PI/2;bow.position.z=.35;g.add(bow)}
+  if(kind===9){const horn=new THREE.Mesh(new THREE.ConeGeometry(.09,.55,8),dark);horn.position.y=.45;horn.position.z=.32;g.add(horn)}
+  if(kind===10){const v=new THREE.Mesh(new THREE.ConeGeometry(.3,.5,6),water);v.position.y=.45;v.position.z=.35;g.add(v)}
+  if(kind===11){const tail=new THREE.Mesh(new THREE.TorusGeometry(.25,.07,8,18),water);tail.rotation.y=Math.PI/2;tail.position.x=.25;g.add(tail)}
+  return g;
+}
+zodiacObjects.forEach((g,i)=>{const av=zodiacAvatar(i);av.scale.setScalar(.9);av.position.y=-.1;g.add(av);g.userData.avatar=av});
+
+const lifeGlow=glowSphere(1.05,0x5be56d,1.4);lifeGlow.position.set(0,1.8,0);lifeGlow.scale.y=1.35;tree.add(lifeGlow);
+const orbitParticles=[];
+for(let i=0;i<70;i++){const p=glowSphere(.035+Math.random()*.045,i%3===0?0xffd45a:0x7ee8ff,1);p.userData.a=Math.random()*TAU;p.userData.r=2+Math.random()*7;p.userData.v=.15+Math.random()*.45;scene.add(p);orbitParticles.push(p)}
+
+const rippleGroup=new THREE.Group();world.add(rippleGroup);
+for(let i=0;i<9;i++){const q=new THREE.Mesh(new THREE.TorusGeometry(.4+i*.35,.018,6,32),new THREE.MeshBasicMaterial({color:0x72d9ff,transparent:true,opacity:.22}));q.rotation.x=Math.PI/2;q.position.set((i%3-1)*2.1,.18,(Math.floor(i/3)-1)*1.2);rippleGroup.add(q)}
+
+const birds=[];
+for(let i=0;i<12;i++){const g=new THREE.Group();const wing1=new THREE.Mesh(new THREE.PlaneGeometry(.35,.08),new THREE.MeshBasicMaterial({color:0xdcecff,side:THREE.DoubleSide,transparent:true,opacity:.8}));const wing2=wing1.clone();wing1.position.x=-.18;wing2.position.x=.18;g.add(wing1,wing2);g.position.set((Math.random()-.5)*18,6+Math.random()*7,(Math.random()-.5)*12);scene.add(g);birds.push({g,phase:Math.random()*TAU})}
+
+let celestialTime=0;
+function animateLiving(now){
+  requestAnimationFrame(animateLiving);
+  const dt=.016; celestialTime+=dt*speed;
+  living.forEach(o=>{o.g.rotation.z=Math.sin(now*.0008+o.phase)*.025;if(o.type==="plant")o.g.rotation.x=Math.sin(now*.0012+o.phase)*.045});
+  zodiacObjects.forEach((g,i)=>{const av=g.userData.avatar;if(av){av.rotation.y+=dt*(.25+(i%3)*.06);av.position.y=-.1+Math.sin(now*.002+i)*.04}});
+  orbitParticles.forEach((p,i)=>{p.userData.a+=dt*p.userData.v;const a=p.userData.a;p.position.set(Math.cos(a)*p.userData.r,9+Math.sin(a*2+i)*2.5,Math.sin(a)*p.userData.r*.45)});
+  birds.forEach((b,i)=>{const a=now*.00012*(1+i%3)+b.phase;b.g.position.x=Math.cos(a)*12;b.g.position.z=Math.sin(a)*7;b.g.position.y=7+Math.sin(a*2)*1.2;b.g.rotation.y=-a;b.g.children[0].rotation.z=Math.sin(now*.008+i)*.5;b.g.children[1].rotation.z=-Math.sin(now*.008+i)*.5});
+  rippleGroup.children.forEach((q,i)=>{q.scale.setScalar(1+((now*.0004+i*.13)%1)*.6);q.material.opacity=.3-(q.scale.x-1)*.25});
+  sunLight.intensity=180+Math.sin(now*.00035)*35;sun.scale.setScalar(1+Math.sin(now*.001)*.025);
+}
+animateLiving(performance.now());
