@@ -17,7 +17,7 @@ const stages=[
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x4b9fd0);
-scene.fog=new THREE.FogExp2(0x78b9cf,.014);
+scene.fog=new THREE.FogExp2(0x78b9cf,.009);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,220);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));
@@ -34,6 +34,7 @@ let time=0,stage=0,stageTimer=0,running=true,speed=1,cycle=0;
 let camYaw=0,camPitch=.12,camDist=18,dragging=false,lastX=0,lastY=0;
 let observerT=.08,cinematicObserver=true;
 const observerPos=new THREE.Vector3(),observerLook=new THREE.Vector3();
+let gameplayActor=null,gameplayMixer=null;
 const world=new THREE.Group();scene.add(world);
 const assetRoot=new THREE.Group();assetRoot.name="REAL_ASSETS";world.add(assetRoot);
 const gltfLoader=new GLTFLoader();
@@ -223,94 +224,100 @@ for(let i=0;i<10;i++){const a=animal(i),ang=i/10*TAU,r=4.7+Math.random()*4;a.pos
 const flowers=new THREE.Group();world.add(flowers);
 for(let i=0;i<32;i++){const a=Math.random()*TAU,r=3+Math.random()*11;sph(flowers,.11,mats.flower,Math.cos(a)*r,.42,Math.sin(a)*r*.58)}
 
-/* REAL 3D ASSET LAYER
-   Uses Poly Haven's public API to resolve CC0 glTF assets at runtime.
-   If the CDN/API is unavailable, the procedural scene remains as a safe fallback.
+/* GAMEPLAY ASSET LAYER
+   Real game-ready CC0 assets, chosen to match the bright stylized third-person
+   gameplay references: dense meadow, varied trees/bushes and a visible observer
+   character. No primitive spheres are used for the main environmental models.
 */
-function setAssetLoadingMessage(text){
- const el=document.getElementById("bootDebug"); if(el) el.textContent=text;
-}
-async function resolvePolyhavenGLTF(assetId,resolution="1k"){
- const r=await fetch("https://api.polyhaven.com/files/"+assetId,{headers:{Accept:"application/json"}});
- if(!r.ok) throw new Error("Poly Haven API "+r.status);
- const data=await r.json();
- const block=data.gltf?.[resolution];
- const file=block?.gltf || block;
- if(!file?.url) throw new Error("No glTF URL for "+assetId);
- return file.url;
-}
-function prepareRealModel(root){
+const GAME_ASSETS={
+ tree1:"https://cdn.jsdelivr.net/gh/anshaneja5/skyline-run@main/public/assets/models/tree1.glb",
+ tree2:"https://cdn.jsdelivr.net/gh/anshaneja5/skyline-run@main/public/assets/models/tree2.glb",
+ tree3:"https://cdn.jsdelivr.net/gh/anshaneja5/skyline-run@main/public/assets/models/tree3.glb",
+ bush:"https://cdn.jsdelivr.net/gh/anshaneja5/skyline-run@main/public/assets/models/bush.glb",
+ forest:"https://cdn.jsdelivr.net/gh/Station-Sciences/bot-crossing@main/public/assets/forest.glb",
+ crew:"https://cdn.jsdelivr.net/gh/Station-Sciences/bot-crossing@main/public/assets/crew.glb"
+};
+function prepareGameplayModel(root){
  root.traverse(o=>{
    if(o.isMesh){
      o.castShadow=true;o.receiveShadow=true;
      if(o.material){
-       const materials=Array.isArray(o.material)?o.material:[o.material];
-       materials.forEach(m=>{
-         if("roughness" in m) m.roughness=Math.min(.9,Math.max(.28,m.roughness??.65));
-         if("envMapIntensity" in m) m.envMapIntensity=1.15;
+       const ms=Array.isArray(o.material)?o.material:[o.material];
+       ms.forEach(m=>{
+         if("roughness" in m)m.roughness=.72;
+         if("metalness" in m)m.metalness=Math.min(.12,m.metalness||0);
+         if("envMapIntensity" in m)m.envMapIntensity=1.15;
        });
      }
    }
  });
 }
-function addRealClone(source,parent,position,scale=1,rotationY=0){
- const c=source.clone(true);
- c.position.set(...position);c.rotation.y=rotationY;c.scale.setScalar(scale);
- prepareRealModel(c);parent.add(c);return c;
+function loadGLTF(url){
+ return new Promise((resolve,reject)=>gltfLoader.load(url,resolve,undefined,reject));
+}
+function addAssetClone(source,parent,pos,scale=1,rot=0){
+ const c=source.clone(true);c.position.set(...pos);c.rotation.y=rot;c.scale.setScalar(scale);prepareGameplayModel(c);parent.add(c);return c;
 }
 async function loadRealWorld(){
- setAssetLoadingMessage("VERSION 2026-09-21-D5 · بارگذاری مدل‌های سه‌بعدی واقعی…");
+ setAssetLoadingMessage("VERSION 2026-09-21-D6 · GAMEPLAY ASSETS · LOADING…");
  try{
-   const [treeUrl,islandUrl,mountainUrl,boulderUrl]=await Promise.all([
-     resolvePolyhavenGLTF("tree_small_02","1k"),
-     resolvePolyhavenGLTF("island_tree_02","1k"),
-     resolvePolyhavenGLTF("mountainside","1k"),
-     resolvePolyhavenGLTF("boulder_01","1k")
+   const [t1,t2,t3,bush,forest,crew]=await Promise.all([
+     loadGLTF(GAME_ASSETS.tree1),loadGLTF(GAME_ASSETS.tree2),loadGLTF(GAME_ASSETS.tree3),
+     loadGLTF(GAME_ASSETS.bush),loadGLTF(GAME_ASSETS.forest),loadGLTF(GAME_ASSETS.crew)
    ]);
-   const [treeData,islandData,mountainData,boulderData]=await Promise.all([
-     new Promise((res,rej)=>gltfLoader.load(treeUrl,res,undefined,rej)),
-     new Promise((res,rej)=>gltfLoader.load(islandUrl,res,undefined,rej)),
-     new Promise((res,rej)=>gltfLoader.load(mountainUrl,res,undefined,rej)),
-     new Promise((res,rej)=>gltfLoader.load(boulderUrl,res,undefined,rej))
-   ]);
-   const treeModel=treeData.scene,islandModel=islandData.scene,mountainModel=mountainData.scene,boulderModel=boulderData.scene;
-   prepareRealModel(treeModel);prepareRealModel(islandModel);prepareRealModel(mountainModel);prepareRealModel(boulderModel);
+   const models=[t1.scene,t2.scene,t3.scene].map(x=>{prepareGameplayModel(x);return x});
+   const bushModel=bush.scene;prepareGameplayModel(bushModel);
 
-   // Replace the primitive environmental stand-ins once real assets are ready.
+   // Hide the old primitive scenery once the real game assets arrive.
    world.traverse(o=>{
      if(o.userData?.proceduralTree || o.userData?.proceduralRock || o.userData?.proceduralEnvironment) o.visible=false;
    });
 
-   // Main Tree of Life: a real scanned/natural tree model, then augmented with the symbolic energy network.
-   const lifeReal=addRealClone(islandModel,assetRoot,[0,0,0],1.9,0.25);
-   lifeReal.name="TreeOfLife_REAL";
-   lifeReal.traverse(o=>{if(o.isMesh)o.frustumCulled=true;});
-
-   // Natural forest ring.
-   const forest=[
-     [-15,-7,.9],[-12,2,.72],[-9,9,.65],[-4,12,.78],[5,12,.72],[11,8,.82],[15,1,.9],
-     [15,-8,.76],[10,-12,.72],[4,-14,.68],[-5,-14,.78],[-12,-11,.72]
+   // Build a large, varied game-style forest instead of repeating one primitive tree.
+   const forestSpots=[
+     [-18,-8,1.35],[-15,-2,1.05],[-13,5,.95],[-10,11,.85],[-5,14,1.0],[2,14,.92],
+     [8,12,1.05],[13,7,1.15],[17,0,1.3],[16,-8,1.05],[10,-13,.92],[3,-15,1.0],
+     [-5,-15,1.12],[-12,-12,.95],[-19,2,.9],[19,6,.88]
    ];
-   forest.forEach((p,i)=>addRealClone(treeModel,assetRoot,p,p[2],(i%7)*.65));
+   forestSpots.forEach((p,i)=>addAssetClone(models[i%3],assetRoot,[p[0],0,p[1]],p[2],(i%8)*.55));
 
-   // Real cliff faces to frame the valley.
-   [[-17,-10,1.35,.25],[17,-9,1.25,-.45],[-18,2,.95,.15],[18,3,.9,-.25]].forEach(p=>{
-     addRealClone(mountainModel,assetRoot,[p[0],0,p[1]],p[2],p[3]);
-   });
-
-   // Real rocks around the river/forest.
-   for(let i=0;i<18;i++){
-     const a=i/18*TAU+.4,r=8.5+(i%5)*1.6;
-     addRealClone(boulderModel,assetRoot,[Math.cos(a)*r,.15,Math.sin(a)*r*.58],.32+(i%3)*.11,a);
+   // Dense meadow edge: bushes fill the gaps between the larger trees.
+   for(let i=0;i<55;i++){
+     const a=i/55*TAU+(i%3)*.11,r=7.5+(i%7)*1.55;
+     addAssetClone(bushModel,assetRoot,[Math.cos(a)*r,.02,Math.sin(a)*r*.68],.42+(i%4)*.09,i*.37);
    }
 
-   setAssetLoadingMessage("VERSION 2026-09-21-D5 · GAMEPLAY WORLD · REAL 3D ASSETS ACTIVE");
-   log("مدل‌های واقعی درخت، صخره و سنگ از Poly Haven بارگذاری شدند.");
+   // A real forest asset is used as an additional distant silhouette layer.
+   const forestLayer=forest.scene;prepareGameplayModel(forestLayer);
+   forestLayer.scale.setScalar(2.2);forestLayer.position.set(0,-.05,-24);
+   forestLayer.userData.gameplayForest=true;assetRoot.add(forestLayer);
+
+   // Tree of Life: use the same game-ready tree language, enlarged and grouped,
+   // while keeping the symbolic energy nodes/paths around it.
+   const lifeTree=addAssetClone(models[1],assetRoot,[0,.05,0],5.4,.2);
+   lifeTree.name="TreeOfLife_GAMEPLAY_REAL";
+   lifeTree.traverse(o=>{if(o.isMesh)o.frustumCulled=true;});
+
+   // Visible third-person observer. It moves automatically; there is no input control.
+   gameplayActor=crew.scene.clone(true);
+   gameplayActor.position.copy(observerPos);
+   gameplayActor.scale.setScalar(1.55);
+   gameplayActor.name="ObserverCharacter_REAL";
+   prepareGameplayModel(gameplayActor);
+   assetRoot.add(gameplayActor);
+   if(crew.animations?.length){
+     gameplayMixer=new THREE.AnimationMixer(gameplayActor);
+     const clip=crew.animations.find(a=>/idle|walk|run/i.test(a.name))||crew.animations[0];
+     gameplayMixer.clipAction(clip).play();
+   }
+
+   setAssetLoadingMessage("VERSION 2026-09-21-D6 · GAMEPLAY WORLD · REAL GAME ASSETS ACTIVE");
+   log("مدل‌های واقعی گیم‌پلی فعال شدند: درخت‌های متنوع، بوته‌ها و شخصیت ناظر.");
  }catch(err){
-   console.warn("Real asset layer unavailable; keeping procedural fallback.",err);
+   console.warn("Gameplay asset layer unavailable; keeping procedural fallback.",err);
    const reason=err?.message||String(err);
-   setAssetLoadingMessage("VERSION 2026-09-21-D5 · FALLBACK · "+reason);
-   log("مدل‌های واقعی لود نشدند: "+reason);
+   setAssetLoadingMessage("VERSION 2026-09-21-D6 · ASSET ERROR · "+reason);
+   log("مدل‌های گیم‌پلی لود نشدند: "+reason);
  }
 }
 
@@ -328,15 +335,15 @@ function setStage(){const s=stages[stage];chapter.textContent=s[0];chapterSub.te
    low to the ground, forward-facing, moving through the world automatically.
 */
 const observerPath=new THREE.CatmullRomCurve3([
- new THREE.Vector3(0,1.45,18),
- new THREE.Vector3(-9,1.45,13),
- new THREE.Vector3(-15,1.45,3),
- new THREE.Vector3(-10,1.45,-7),
- new THREE.Vector3(0,1.45,-12),
- new THREE.Vector3(11,1.45,-8),
- new THREE.Vector3(15,1.45,1),
- new THREE.Vector3(9,1.45,12),
- new THREE.Vector3(0,1.45,18)
+ new THREE.Vector3(0,.95,18),
+ new THREE.Vector3(-9,.95,13),
+ new THREE.Vector3(-15,0.95,3),
+ new THREE.Vector3(-10,0.95,-7),
+ new THREE.Vector3(0,0.95,-12),
+ new THREE.Vector3(11,0.95,-8),
+ new THREE.Vector3(15,0.95,1),
+ new THREE.Vector3(9,0.95,12),
+ new THREE.Vector3(0,0.95,18)
 ],true,"catmullrom",.55);
 
 const trailCurve=new THREE.CatmullRomCurve3([
@@ -345,8 +352,8 @@ const trailCurve=new THREE.CatmullRomCurve3([
  new THREE.Vector3(13,.045,3),new THREE.Vector3(7,.045,12),new THREE.Vector3(0,.045,19)
 ],true,"catmullrom",.55);
 const trail=new THREE.Mesh(
- new THREE.TubeGeometry(trailCurve,180,1.05,8,true),
- new THREE.MeshStandardMaterial({color:0x8c6a43,roughness:1})
+ new THREE.TubeGeometry(trailCurve,180,.34,6,true),
+ new THREE.MeshStandardMaterial({color:0x7b633f,roughness:1})
 );
 trail.name="AdventureTrail";
 trail.receiveShadow=true;
@@ -357,10 +364,24 @@ function updateObserver(dt){
  observerT=(observerT+dt*.012*speed)%1;
  observerPath.getPointAt(observerT,observerPos);
  observerPath.getPointAt((observerT+.012)%1,observerLook);
- observerLook.y+=2.1;
+ const tangent=observerLook.clone().sub(observerPos).normalize();
+ if(gameplayActor){
+   gameplayActor.position.copy(observerPos);
+   gameplayActor.rotation.y=Math.atan2(tangent.x,tangent.z);
+ }
+ if(gameplayMixer) gameplayMixer.update(dt*speed);
+ observerLook.copy(observerPos);
+ observerLook.y+=1.8;
 }
 
 function cameraUpdate(){
+ if(cinematicObserver){
+   const tangent=observerLook.clone().sub(observerPos).normalize();
+   const behind=observerPos.clone().sub(tangent.multiplyScalar(6.2));
+   camera.position.lerp(new THREE.Vector3(behind.x,observerPos.y+3.25,behind.z),.16);
+   camera.lookAt(observerLook);
+   return;
+ }
  const target=new THREE.Vector3(0,6.8,0);
  const x=Math.sin(camYaw)*Math.cos(camPitch)*camDist,y=target.y+Math.sin(camPitch)*camDist,z=Math.cos(camYaw)*Math.cos(camPitch)*camDist;
  camera.position.set(x,y,z);camera.lookAt(target);
