@@ -243,9 +243,21 @@ const meadow=new THREE.Group();world.add(meadow);
 for(let i=0;i<180;i++){const g=new THREE.Group(),a=Math.random()*TAU,r=3+Math.random()*10;const blade=new THREE.Mesh(new THREE.ConeGeometry(.025,.25+Math.random()*.35,5),mat(i%5?0x4d9d4d:0x78c85c,.9));g.add(blade);g.position.set(Math.cos(a)*r,.35,Math.sin(a)*r*.58);g.rotation.y=Math.random()*TAU;meadow.add(g)}
 const solarSectors=[];
 for(let i=0;i<12;i++){const a=i/12*TAU;const sector=new THREE.Mesh(new THREE.RingGeometry(9.7,10.15,24,1,a-.11),new THREE.MeshBasicMaterial({color:i%3===0?0xffd65a:i%3===1?0x5fc8ff:0xc58cff,transparent:true,opacity:.2,side:THREE.DoubleSide}));sector.rotation.x=Math.PI/2;sector.position.copy(zodiacGroup.position);solarSectors.push(sector);scene.add(sector)}
+
+const newborns=[];
+function spawnNewborn(){
+  if(newborns.length>=12){const old=newborns.shift();creatureGroup.remove(old)}
+  const parent=creatures[Math.floor(Math.random()*creatures.length)];
+  const baby=creature(0xe5c98d,.42);
+  baby.position.copy(parent.position).add(new THREE.Vector3((Math.random()-.5)*1.4,.05,(Math.random()-.5)*1.4));
+  baby.userData={type:"life",index:100+newborns.length,newborn:true,phase:Math.random()*TAU};
+  creatureGroup.add(baby);newborns.push(baby);
+  logEvent("نسل جدید پدید آمد · موجود جوان وارد محیط شد.");
+}
+
 const lifeEvents=[["تولد بذر","انرژی از درخت به زمین می‌رسد."],["رشد","گیاه از خاک بالا می‌آید."],["بلوغ","گیاه و موجود زنده به مرحلهٔ بالغ می‌رسند."],["زایش","یک موجود جدید در چرخه ظاهر می‌شود."],["بازگشت","انرژی و ماده به چرخه بازمی‌گردد."]];
 let lifeEventIndex=0,lifeEventClock=0;
-function advanceLifeEvent(dt){lifeEventClock+=dt*speed;if(lifeEventClock<4.2)return;lifeEventClock=0;lifeEventIndex=(lifeEventIndex+1)%lifeEvents.length;visualState.generation++;logEvent(lifeEvents[lifeEventIndex][0]+" — "+lifeEvents[lifeEventIndex][1])}
+function advanceLifeEvent(dt){lifeEventClock+=dt*speed;if(lifeEventClock<4.2)return;lifeEventClock=0;lifeEventIndex=(lifeEventIndex+1)%lifeEvents.length;visualState.generation++;if(lifeEventIndex===3)spawnNewborn();logEvent(lifeEvents[lifeEventIndex][0]+" — "+lifeEvents[lifeEventIndex][1])}
 function polishAsset(root){root.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.receiveShadow=true;if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if("roughness" in m)m.roughness=Math.min(.85,Math.max(.18,m.roughness??.55));if("envMapIntensity" in m)m.envMapIntensity=1.25})}})}
 function animateVisualPass(dt,now){
   loadedActors.forEach(a=>{if(!a.root.userData.polished){polishAsset(a.root);a.root.userData.polished=true}});updateExternalAssets(dt);
